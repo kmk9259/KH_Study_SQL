@@ -1,0 +1,142 @@
+--1
+CREATE TABLE TB_CATEGORY
+(
+    NAME VARCHAR2(10),
+    USE_YN CHAR(1) DEFAULT 'Y'
+);
+
+--2
+CREATE TABLE TB_CLASS_TYPE
+(
+    NO VARCHAR2(5) PRIMARY KEY,
+    NAME VARCHAR2(10)
+);
+
+--3
+ALTER TABLE TB_CATEGORY
+ADD CONSTRAINT PK_CATEGORY PRIMARY KEY (NAME);
+
+--4
+ALTER TABLE TB_CLASS_TYPE
+MODIFY NAME CONSTRAINT NN_NAME NOT NULL;
+
+--5
+ALTER TABLE TB_CLASS_TYPE
+MODIFY NO VARCHAR2(10);
+
+ALTER TABLE TB_CATEGORY
+MODIFY NAME VARCHAR2(20);
+
+ALTER TABLE TB_CLASS_TYPE
+MODIFY NAME VARCHAR2(20);
+
+--6
+ALTER TABLE TB_CLASS_TYPE
+RENAME COLUMN NO TO CLASS_TYPE_NO;
+
+ALTER TABLE TB_CLASS_TYPE
+RENAME COLUMN NAME TO CLASS_TYPE_NAME;
+
+ALTER TABLE TB_CATEGORY
+RENAME COLUMN NAME TO CATEGORY_NAME;
+
+--7
+ALTER TABLE TB_CATEGORY
+RENAME CONSTRAINT PK_NAME TO PK_CATEGORY_NAME;
+
+ALTER TABLE TB_CLASS_TYPE
+RENAME CONSTRAINT SYS_C007265 TO PK_CLASS_TYPE_NAME;
+
+--8
+INSERT INTO TB_CATEGORY VALUES ('공학','Y');
+INSERT INTO TB_CATEGORY VALUES ('자연과학','Y');
+INSERT INTO TB_CATEGORY VALUES ('의학','Y');
+INSERT INTO TB_CATEGORY VALUES ('예체능','Y');
+INSERT INTO TB_CATEGORY VALUES ('인문사회','Y');
+COMMIT;
+
+--9
+ALTER TABLE TB_DEPARTMENT
+ADD CONSTRAINT FK_DEPARTMENT_CATEGORY FOREIGN KEY(CATEGORY) REFERENCES TB_CATEGORY(CATEGORY_NAME);
+
+--10
+GRANT CREATE VIEW TO KH;
+
+CREATE OR REPLACE VIEW VW_학생일반정보
+    (학번, 학생이름, 주소)
+    AS
+    SELECT STUDENT_NO, STUDENT_NAME, STUDENT_ADDRESS
+    FROM TB_STUDENT;
+
+--11
+CREATE OR REPLACE VIEW VW_지도면담
+    (학생이름, 학과이름, 지도교수이름)
+    AS
+    SELECT 
+        A.STUDENT_NAME,
+        B.DEPARTMENT_NAME, 
+        C.PROFESSOR_NAME
+    FROM TB_STUDENT A
+    JOIN TB_DEPARTMENT B ON A.DEPARTMENT_NO = B.DEPARTMENT_NO
+    JOIN TB_PROFESSOR C ON A.COACH_PROFESSOR_NO = C.PROFESSOR_NO
+    ORDER BY 2;
+    
+--12
+CREATE OR REPLACE VIEW VW_학과별학생수
+    AS
+    SELECT
+        DEPARTMENT_NAME,
+        COUNT(STUDENT_NO) STUDENT_COUNT
+    FROM TB_DEPARTMENT A
+    JOIN TB_STUDENT B ON A.DEPARTMENT_NO = B.DEPARTMENT_NO
+    GROUP BY DEPARTMENT_NAME;
+    
+--13
+UPDATE VW_학생일반정보
+SET 학생이름 ='김민경'
+WHERE 학번 = 'A213046';
+
+--14
+--WITH READ ONLY 옵션으로 DML 수행이 불가하고 뷰에 대해 조회만 가능
+
+--15
+
+WITH C1 AS
+    (
+        SELECT
+            A.CLASS_NO 과목번호,
+            A.CLASS_NAME 과목이름,
+            COUNT(*) "누적수강생수(명)"
+        FROM TB_CLASS A
+        JOIN TB_GRADE B ON A.CLASS_NO = B.CLASS_NO
+        GROUP BY A.CLASS_NO, A.CLASS_NAME
+        ORDER BY 3 DESC
+    ),
+    C2 AS
+    (
+        SELECT
+            A.CLASS_NO 과목번호,
+            A.CLASS_NAME 과목이름,
+            COUNT(*) "최근3년수강생수"
+        FROM TB_CLASS A
+        JOIN TB_GRADE B ON A.CLASS_NO = B.CLASS_NO
+        WHERE SUBSTR(TERM_NO,1,4) IN (  
+                                            (SELECT
+                                                SUBSTR(MAX(TERM_NO),1,4)
+                                             FROM TB_GRADE),
+                                             (SELECT
+                                                SUBSTR(MAX(TERM_NO),1,4)
+                                             FROM TB_GRADE)-1,
+                                             (SELECT
+                                                SUBSTR(MAX(TERM_NO),1,4)
+                                             FROM TB_GRADE)-2
+                                            )
+        GROUP BY A.CLASS_NO, A.CLASS_NAME
+        ORDER BY 3 DESC
+    )
+SELECT
+    A.*,
+    B."최근3년수강생수"
+FROM C1 A
+JOIN C2 B ON A.과목이름 = B.과목이름
+WHERE ROWNUM<4;
